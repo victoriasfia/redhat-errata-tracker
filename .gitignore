@@ -1,3 +1,5 @@
 # Ignora cache do Python
 __pycache__/
 *.pyc
+venv
+generated_reports
