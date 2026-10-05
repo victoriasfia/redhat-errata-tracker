@@ -8,7 +8,7 @@ import requests
 # configurações do relatório
 PRODUCT = "Red Hat OpenShift GitOps"
 VERSION = "1.21"
-DAYS_BACK = 50
+DAYS_BACK = 120
 
 # Tipos de advisory que serão incluídos no relatório. Se vazio, inclui todos.
 ADVISORY_TYPES = ["Bug Fix Advisory", "Security Advisory", "Product Enhancement Advisory"]
@@ -88,7 +88,7 @@ def fetch_all(session: requests.Session, product_fq: str, cutoff: datetime) -> l
         response = data.get("response", {})
         docs = response.get("docs", [])
         total = response.get("numFound", 0)
-        print(f"[INFO] numFound={total} | página com {len(docs)} documento(s)")
+        print(f"[INFO] Página com {len(docs)} documento(s)")
         if not docs:
             break
         docs_all.extend(docs)
@@ -105,10 +105,9 @@ def fetch_errata(product: str, version: str, cutoff: datetime) -> list:
     """Tenta cada variante de filtro até obter resultados."""
     with requests.Session() as session:
         for label, product_fq in product_filter_candidates(product, version):
-            print(f"[INFO] Tentando filtro: {label}")
             docs = fetch_all(session, product_fq, cutoff)
             if docs:
-                print(f"[INFO] Filtro '{label}' retornou {len(docs)} errata(s).")
+                print(f"[INFO]'{PRODUCT} | {VERSION}' retornou {len(docs)} errata(s).")
                 return docs
             print(f"[AVISO] Filtro '{label}' retornou 0 resultados.")
     return []
