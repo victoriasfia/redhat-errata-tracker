@@ -30,7 +30,6 @@ def escape_solr(value: str) -> str:
     """Escapa espaços para o Solr (' ' -> '\\ ')."""
     return value.replace(" ", "\\ ")
 
-
 def product_filter_candidates(product: str, version: str) -> list:
     """
     Variantes do filtro de produto, testadas em ordem até alguma retornar dados.
@@ -43,7 +42,6 @@ def product_filter_candidates(product: str, version: str) -> list:
          f'portal_product_names:"{product}" AND portal_synopsis:"{version}"'),
     ]
 
-
 def parse_date(value):
     """Converte '2026-05-12T00:00:00Z' em datetime (ou None se inválido)."""
     if not value:
@@ -52,7 +50,6 @@ def parse_date(value):
         return datetime.strptime(str(value)[:10], "%Y-%m-%d")
     except ValueError:
         return None
-
 
 def request_page(session: requests.Session, product_fq: str, start: int) -> dict:
     """Faz uma requisição paginada. Em erro, mostra a URL tentada e encerra."""
@@ -82,7 +79,6 @@ def request_page(session: requests.Session, product_fq: str, start: int) -> dict
     print(f"[ERRO] URL tentada: {prepared.url}")
     sys.exit(1)
 
-
 def fetch_all(session: requests.Session, product_fq: str, cutoff: datetime) -> list:
     """Pagina os resultados até cobrir o período (ordenado por update date desc)."""
     docs_all = []
@@ -104,7 +100,6 @@ def fetch_all(session: requests.Session, product_fq: str, cutoff: datetime) -> l
         if last_update and last_update < cutoff:
             break
     return docs_all
-
 
 def fetch_errata(product: str, version: str, cutoff: datetime) -> list:
     """Tenta cada variante de filtro até obter resultados."""
@@ -128,7 +123,6 @@ def as_text(value) -> str:
         return ", ".join(str(v) for v in value)
     return str(value)
 
-
 def filter_errata(docs: list, cutoff: datetime) -> list:
     """Filtra por data de publicação e tipo de advisory; ordena do mais recente."""
     wanted = {t.lower() for t in ADVISORY_TYPES}
@@ -147,7 +141,6 @@ def filter_errata(docs: list, cutoff: datetime) -> list:
 
 
 # ==================== GERAÇÃO DO HTML ==========================
-
 def severity_class(severity: str) -> str:
     sev = (severity or "").strip().lower()
     if sev in ("important", "critical"):
@@ -157,7 +150,6 @@ def severity_class(severity: str) -> str:
     if sev == "low":
         return "sev-low"
     return "sev-none"
-
 
 CSS = """
 body { font-family: 'Open Sans', Arial, sans-serif; background: #fff; color: #333; margin: 0; padding: 32px; }
@@ -180,7 +172,6 @@ a:hover { text-decoration: underline; }
 .empty { text-align: center; padding: 32px; color: #666; }
 footer { margin-top: 24px; font-size: 12px; color: #888; }
 """
-
 
 def build_rows(errata: list) -> str:
     if not errata:
@@ -205,7 +196,6 @@ def build_rows(errata: list) -> str:
             "</tr>"
         )
     return "\n".join(rows)
-
 
 def build_html(errata: list, start: datetime, end: datetime, generated_at: datetime) -> str:
     types = ", ".join(ADVISORY_TYPES) if ADVISORY_TYPES else "Todos"
@@ -237,13 +227,13 @@ def build_html(errata: list, start: datetime, end: datetime, generated_at: datet
   </tbody>
 </table>
 </div>
-<footer>Gerado em {generated_at.strftime('%d/%m/%Y %H:%M')} a partir da API pública da Red Hat.</footer>
+<footer>Gerado em {generated_at.strftime('%d/%m/%Y %H:%M')}.</footer>
 </body>
 </html>
 """
 
-
 def save_report(content: str, generated_at: datetime) -> str:
+    """Salva o relatório em arquivo HTML e retorna o caminho do arquivo."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     filename = f"Report_Erratas_{generated_at.strftime('%Y%m%d_%H%M')}.html"
     path = os.path.join(OUTPUT_DIR, filename)
@@ -267,7 +257,6 @@ def main():
 
     path = save_report(build_html(errata, cutoff, today, now), now)
     print(f"[OK] Relatório salvo em: {path}")
-
 
 if __name__ == "__main__":
     main()
