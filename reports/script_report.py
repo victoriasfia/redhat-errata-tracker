@@ -211,8 +211,10 @@ def build_html(errata: list, start: datetime, end: datetime, generated_at: datet
 <body>
 <header>
   <h1>Relatório de Erratas</h1>
-  <div class="meta"><strong>Produto:</strong> {html.escape(PRODUCT)} &nbsp;|&nbsp; <strong>Versão:</strong> {html.escape(VERSION)}</div>
-  <div class="meta"><strong>Período analisado:</strong> {start.strftime('%d/%m/%Y')} a {end.strftime('%d/%m/%Y')} &nbsp;|&nbsp; <strong>Tipos:</strong> {html.escape(types)} &nbsp;|&nbsp; <strong>Total:</strong> {len(errata)}</div>
+  <div class="meta"><strong>Produto:</strong> {html.escape(PRODUCT)} &nbsp;|&nbsp; 
+  <strong>Versão:</strong> {html.escape(VERSION)}</div>
+  <div class="meta"><strong>Período analisado:</strong> {start.strftime('%d/%m/%Y')} a {end.strftime('%d/%m/%Y')} &nbsp;|&nbsp; 
+  <strong>Total:</strong> {len(errata)}</div>
 </header>
 <div class="table-wrap">
 <table>
