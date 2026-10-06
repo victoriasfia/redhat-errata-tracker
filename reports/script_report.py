@@ -52,7 +52,7 @@ def parse_date(value):
 
 def parse_version_tuple(v_str: str) -> tuple:
     """
-    convrte string em tupla para comparação.
+    convrte string em tupla para comparação para facilitar a comparação de versões.
     """
     match = re.search(r'(\d+\.\d+(?:\.\d+)?)', str(v_str))
     if match:
