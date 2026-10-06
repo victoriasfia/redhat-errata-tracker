@@ -6,7 +6,7 @@ Este é um script em Python que consulta automaticamente a API pública da Red H
 ## Funcionalidades
 * **Busca Inteligente**: Utiliza filtros de fallback para garantir que o produto seja encontrado, mesmo com inconsistências na taxonomia da API da Red Hat (tenta estrutura hierárquica e busca em texto livre).
 
-+ **Filtragem por Período e Tipo**: Permite definir um limite de dias (ex: últimos 50 dias) e escolher quais tipos de erratas importar (Bug Fix, Security, Enhancement).
++ **Filtragem por Intervalo de Versões**: Permite definir um intervalo de versões (ex: da versão 1.21 até a 1.24) para buscar todas as atualizações lançadas nesse ciclo, independentemente da data, e escolher quais tipos de erratas importar (Bug Fix, Security, Enhancement).
 
 * **Relatório HTML**: Gera um arquivo HTML único com CSS embutido, dispensando dependências externas, contendo links diretos para a documentação oficial de cada errata.
 ---
@@ -16,14 +16,17 @@ Este é um script em Python que consulta automaticamente a API pública da Red H
 ## Configuração antes de executar 
 
 ```python
+
 # Configurações do relatório
 
-# nome exato do produto (ex: "Red Hat OpenShift Container Platform")
+# Nome exato do produto (ex: "Red Hat OpenShift Container Platform")
 PRODUCT = "Red Hat OpenShift GitOps" 
-# escolha a versão
+
+# Versão inicial do intervalo (sua versão atual)
 VERSION = "1.21"
-# Quantos dias para trás o script deve buscar
-DAYS_BACK = 120
+
+# Versão final do intervalo (versão alvo/mais recente)
+LAST_VERSION = "1.24"
 ```
 
 ## Como executar
@@ -44,6 +47,6 @@ Execute o projeto
 ```
 
 ## Resultado
-O script criará automaticamente uma pasta chamada `generated_reports` no mesmo diretório em que foi executado.
+O script criará automaticamente uma pasta chamada generated_reports no mesmo diretório em que foi executado.
 
-Dentro dela, você encontrará o relatório gerado, por exemplo: `Report_Erratas_20261005_1711.html`. Basta abrir este arquivo em qualquer navegador web para visualizar a tabela de correções classificada por severidade e data.
+Dentro dela, você encontrará o relatório gerado, por exemplo: Report_Erratas_20261005_1711.html. Basta abrir este arquivo em qualquer navegador web para visualizar a tabela de correções classificada por severidade, organizando as erratas correspondentes às versões solicitadas.
