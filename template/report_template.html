@@ -103,7 +103,10 @@
                 <tr>
                     <th>Advisory</th>
                     <th>Synopsis</th>
+                    <th>Advisory Type</th>
                     <th>Severity</th>
+                    <th>Issued Date</th>
+                    <th>Updated Date</th>
                 </tr>
             </thead>
             <tbody>
@@ -111,7 +114,10 @@
                     <tr>
                         <td><a href="https://access.redhat.com/errata/{{ doc.id }}">{{ doc.id }}</a></td>
                         <td>{{ doc.portal_synopsis }}</td>
+                        <td>{{ doc.portal_advisory_type }}</td>
                         <td>{{ doc.portal_severity }}</td>
+                        <td>{{ doc.portal_update_date }}</td>
+                        <td>{{ doc.portal_update_date }}</td>
                     </tr>
                 {% else %}
                     <tr>
