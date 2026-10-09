@@ -1,0 +1,50 @@
+products:
+  - product: "Cert Manager support for Red Hat OpenShift"
+    version: "1.20"
+    last_version: "1.20.1"
+    date: "2026-10-02T19:54:14Z"
+
+  - product: "Cost Management"
+    version: "4"
+    last_version: "4.4.2"
+    date: "2026-08-21T17:27:07Z"
+
+  - product: "DevWorkspace Operator"
+    version: "0.43"
+    last_version: "0.43.0"
+    date: "2026-09-30T21:27:07Z"
+
+  - product: "Red Hat OpenShift GitOps"
+    version: "1.21"
+    last_version: "1.21.4"
+    date: "2026-09-30T21:27:07Z"
+
+  - product: "Red Hat Web Terminal"
+    version: "1.15"
+    last_version: "1.15.2"
+    date: "2026-09-30T21:27:35Z"
+
+  - product: "Red Hat OpenShift Container Platform"
+    version: "4.20"
+    last_version: "4.20 "
+    date: "2026-08-01T15:02:22Z"
+
+  - product: "Logging Subsystem for Red Hat OpenShift"
+    version: "6"
+    last_version: "6.6.1"
+    date: "2026-09-30T14:30:02Z"
+
+  - product: "OpenShift API for Data Protection"
+    version: "1.5"
+    last_version: "1.5.8"
+    date: "2026-09-09T17:36:23Z"
+
+  - product: "Red Hat OpenShift Data Foundation"
+    version: "4.20"
+    last_version: "4.20.19"
+    date: "2026-10-02T15:02:22Z"
+
+  - product: "Red Hat Advanced Cluster Security for Kubernetes"
+    version: "4.11"
+    last_version: "4.11.4"
+    date: "2026-09-16T05:43:17Z"
