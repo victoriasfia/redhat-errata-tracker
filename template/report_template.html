@@ -2,16 +2,8 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Red Hat Errata Report</title>
+    <title>Red Hat: Relatório de Erratas</title>
     <style>
-        body { 
-            font-family: 'Open Sans', Arial, sans-serif; 
-            padding: 32px; 
-        }
-        table { 
-            border-collapse: collapse; 
-            width: 100%; 
-            font-size: 14px; }
         body { 
             font-family: 'Open Sans', Arial, sans-serif; 
             background: #fff; 
@@ -75,57 +67,96 @@
             text-align: center; padding: 32px; color: #666; }
         footer { 
             margin-top: 24px; font-size: 12px; color: #888; }
+
+        /* --- Estilos da funcionalidade de Abrir e Fechar --- */
+        details {
+            margin-bottom: 24px;
+            border-bottom: 1px solid #e6e6e6;
+            padding-bottom: 16px;
+        }
+        summary.collapsible-title {
+            cursor: pointer;
+            list-style: none; /* Remove a setinha padrão do HTML */
+            user-select: none;
+        }
+        summary.collapsible-title::-webkit-details-marker {
+            display: none; /* Remove a setinha no Chrome/Safari */
+        }
+        summary.collapsible-title h2 {
+            display: inline-block;
+            margin: 0;
+            vertical-align: middle;
+        }
+        summary.collapsible-title::before {
+            content: "[+] ";
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #151515;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+        /* Quando a aba estiver aberta, troca para [-] */
+        details[open] > summary.collapsible-title::before {
+            content: "[-] ";
+        }
+        .details-content {
+            margin-top: 16px;
+        }
     </style>
 </head>
 <body>
+    <img src="https://intranet.prodest.es.gov.br/Media/IntranetProdest/_Profiles/44f0b16d/d8e43242/Logomarca_Prodest_320.png?v=639063793643692270" width="220" 
+    style="width: 90px; max-width: 100%; height: auto; border: 0; margin-bottom: 16px;">
     <header>
-        <h1>Red Hat Errata Report</h1>
+        <h1>Red Hat: Relatório de Erratas</h1>
         <div class="meta"><strong>Gerado em:</strong> {{ generated_at.strftime("%d/%m/%Y %H:%M:%S UTC") }}</div>
     </header>
 
     <!-- loop de todos os produtos-->
     {% for item in report_data %}
-        <h2>{{ item.product }}</h2>
-        
-        <div class="product-meta">
-            <strong>Versão utilizada:</strong> {{ item.version }}<br>
-            <strong>Data inicial:</strong> 
-            {% if item.start_date %}
-                {{ item.start_date.strftime("%d/%m/%Y %H:%M:%S UTC") }}
-            {% else %}
-                Não registrada
-            {% endif %}<br>
-            <strong>Data final:</strong> {{ item.end_date.strftime("%d/%m/%Y %H:%M:%S UTC") }}
-        </div>
+        <details>
+            <summary class="collapsible-title">
+                <h2>{{ item.product }}</h2>
+            </summary>
+            
+            <div class="details-content">
+                <div class="product-meta">
+                    <strong>Versão utilizada:</strong> {{ item.version }}<br>
+                    
+                </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Advisory</th>
-                    <th>Synopsis</th>
-                    <th>Advisory Type</th>
-                    <th>Severity</th>
-                    <th>Issued Date</th>
-                    <th>Updated Date</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for doc in item.errata %}
-                    <tr>
-                        <td><a href="https://access.redhat.com/errata/{{ doc.id }}">{{ doc.id }}</a></td>
-                        <td>{{ doc.portal_synopsis }}</td>
-                        <td>{{ doc.portal_advisory_type }}</td>
-                        <td>{{ doc.portal_severity }}</td>
-                        <td>{{ doc.portal_update_date }}</td>
-                        <td>{{ doc.portal_update_date }}</td>
-                    </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="3">Nenhuma errata encontrada.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Advisory</th>
+                                <th>Synopsis</th>
+                                <th>Advisory Type</th>
+                                <th>Severity</th>
+                                <th>Issued Date</th>
+                                <th>Updated Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in item.errata %}
+                                <tr>
+                                    <td><a href="{{ doc.url }}">{{ doc.id }}</a></td>
+                                    <td>{{ doc.synopsis }}</td>
+                                    <td>{{ doc.advisory_type }}</td>
+                                    <td><span class="badge {{ doc.severity_class }}">{{ doc.severity }}</span></td>
+                                    <td>{{ doc.pub_date.strftime("%d/%m/%Y") }}</td>
+                                    <td>{{ doc.upd_date.strftime("%d/%m/%Y") }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="empty">Nenhuma errata encontrada.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </details>
     {% endfor %}
 </body>
 </html>
