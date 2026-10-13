@@ -74,6 +74,9 @@ def request_page(session: requests.Session, product_fq: str, start: int) -> dict
     headers = {"Accept": "application/json", "User-Agent": "errata-report/2.0"}
     prepared = requests.Request("GET", API_URL, params=params, headers=headers).prepare()
 
+    if start == 0:
+        print(f"          [LINK JSON] {prepared.url}")
+
     try:
         response = session.send(prepared, timeout=TIMEOUT)
         response.raise_for_status()
@@ -82,7 +85,9 @@ def request_page(session: requests.Session, product_fq: str, start: int) -> dict
         print(f"[ERRO] Falha na requisição da API: {exc}")
     return {}
 
+
 def fetch_all(session: requests.Session, product_fq: str, cutoff: datetime) -> list:
+    """Busca todas as páginas de resultados da API para um produto específico, respeitando o cutoff."""
     docs_all = []
     start = 0
     for _ in range(MAX_PAGES):
@@ -90,7 +95,7 @@ def fetch_all(session: requests.Session, product_fq: str, cutoff: datetime) -> l
         response = data.get("response", {})
         docs = response.get("docs", [])
         total = response.get("numFound", 0)
-        
+        print(f"[INFO] Total de documentos encontrados para o filtro '{product_fq}': {total}")
         if not docs:
             break
         docs_all.extend(docs)
@@ -105,10 +110,11 @@ def fetch_all(session: requests.Session, product_fq: str, cutoff: datetime) -> l
     return docs_all
 
 def fetch_errata(product: str, version: str, cutoff: datetime) -> list:
+    """Busca erratas para um produto e versão específicos, aplicando filtros de data."""
     with requests.Session() as session:
         for label, product_fq in product_filter_candidates(product, version):
-            docs = fetch_all(session, product_fq, cutoff)
-            if docs:
+            docs = fetch_all(session, product_fq, cutoff) # Busca todas as páginas de resultados
+            if docs: # Se encontrou resultados, retorna imediatamente
                 return docs
             print(f"  [AVISO] Filtro '{label}' retornou 0 resultados.")
     return []
@@ -120,6 +126,7 @@ def as_text(value) -> str:
     return str(value)
 
 def severity_class(severity: str) -> str:
+    """Retorna a classe CSS baseada na severidade do advisory."""
     sev = (severity or "").strip().lower()
     if sev in ("important", "critical"): return "sev-high"
     if sev == "moderate": return "sev-moderate"
@@ -136,8 +143,8 @@ def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetim
             continue
             
         # Filtro de Período data inicial e final
-        if start_date and pub_date < start_date: continue
-        if pub_date > end_date: continue
+        if start_date and pub_date < start_date: continue # se data de publicação for menor que a data inicial, ignora
+        if pub_date > end_date: continue # se data de publicação for maior que a data final, ignora
             
         # Filtro de Advisory Type
         adv_type = as_text(doc.get("portal_advisory_type"))
@@ -166,6 +173,7 @@ def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetim
 
 # gera relatorio 
 def save_report(report_data: list, generated_at: datetime):
+    """Salva o relatório em HTML usando Jinja2 e retorna o caminho do arquivo gerado."""
     env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
     try:
         template = env.get_template(TEMPLATE_FILE)
