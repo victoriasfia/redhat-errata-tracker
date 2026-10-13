@@ -1,6 +1,7 @@
 import os
 import sys
 import yaml
+import re             
 from datetime import datetime, timezone
 import requests
 from jinja2 import Environment, FileSystemLoader
@@ -35,9 +36,8 @@ def escape_solr(value: str) -> str:
 def product_filter_candidates(product: str, version: str) -> list:
     esc = escape_solr(product)
     return [
-        ("produto|*|versão|*", f"portal_product_filter:{esc}|*|{version}|*"),
-        ("produto|*|versão|", f"portal_product_filter:{esc}|*|{version}|"),
-        ("nome do produto + versão na synopsis", f'portal_product_names:"{product}" AND portal_synopsis:"{version}"'),
+        ("qualquer versão do produto", f"portal_product_filter:{esc}|*"),
+        ("nome do produto na synopsis", f'portal_product_names:"{product}"'),
     ]
 
 def parse_date(value):
@@ -118,6 +118,26 @@ def fetch_errata(product: str, version: str, cutoff: datetime) -> list:
                 return docs
             print(f"  [AVISO] Filtro '{label}' retornou 0 resultados.")
     return []
+def is_version_in_range(doc: dict, v_start: str, v_end: str) -> bool:
+    """Lê o texto da errata e verifica se a versão mencionada pertence ao escopo desejado."""
+    synopsis = str(doc.get("portal_synopsis") or "")
+    product_names = " ".join(doc.get("portal_product_names") or [])
+    full_text = synopsis + " " + product_names
+    
+    v_start = str(v_start).strip() if v_start else ""
+    v_end = str(v_end).strip() if v_end else ""
+    
+    # A versão inicial e final são IGUAIS (Ex: 4.20 e 4.20)
+    # Rejeita tudo que não tiver "4.20" ou "4.20.x" escrito na sinopse.
+    if v_start == v_end and v_start:
+        pattern_exact = r'\b' + re.escape(v_start) + r'\b'
+        pattern_patch = r'\b' + re.escape(v_start) + r'\.\d+\b'
+        
+        if re.search(pattern_exact, full_text) or re.search(pattern_patch, full_text):
+            return True
+        return False
+            
+    return True
 
 # tratamento de dados
 def as_text(value) -> str:
@@ -133,7 +153,7 @@ def severity_class(severity: str) -> str:
     if sev == "low": return "sev-low"
     return "sev-none"
 
-def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetime) -> list:
+def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetime, v_start: str, v_end: str) -> list:
     """Filtra pelas datas exatas, tipo de advisory, e formata para o template."""
     wanted = {t.lower() for t in ADVISORY_TYPES}
     result = []
@@ -143,8 +163,13 @@ def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetim
             continue
             
         # Filtro de Período data inicial e final
-        if start_date and pub_date < start_date: continue # se data de publicação for menor que a data inicial, ignora
-        if pub_date > end_date: continue # se data de publicação for maior que a data final, ignora
+        if start_date and pub_date < start_date: continue
+        if pub_date > end_date: continue
+
+        # --- NOVO: FILTRO INTELIGENTE DE VERSÃO ---
+        if not is_version_in_range(doc, v_start, v_end):
+            continue
+        # ------------------------------------------
             
         # Filtro de Advisory Type
         adv_type = as_text(doc.get("portal_advisory_type"))
@@ -234,8 +259,8 @@ def main():
             print(f"       Período: 'Data inicial não registrada' a {now_utc.strftime('%d/%m/%Y %H:%M:%S')} (UTC)")
 
         # Consulta e Filtra a API da Red Hat
-        docs = fetch_errata(product_name, version, start_date)
-        errata_formatada = filter_and_format_errata(docs, start_date, now_utc)
+        docs = fetch_errata(product_name, last_version, start_date)
+        errata_formatada = filter_and_format_errata(docs, start_date, now_utc, version, last_version)
         
         print(f"       -> {len(errata_formatada)} errata(s) encontrada(s) no período.")
 
