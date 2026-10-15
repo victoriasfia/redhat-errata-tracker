@@ -1,11 +1,14 @@
 import os
 import sys
 import yaml
-import re             
 from datetime import datetime, timezone
 import requests
 from jinja2 import Environment, FileSystemLoader
-import time
+import re
+
+VERSION_RE = re.compile(r'(?<![\d.])(\d+)\.(\d+)(?:\.\d+)*(?!\d)')
+DEBUG_VERSIONS = False  # True: imprime versões detectadas e a origem de cada errata
+INCLUDE_UNKNOWN_VERSION = False  
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -24,15 +27,13 @@ ADVISORY_TYPES = ["Bug Fix Advisory", "Security Advisory", "Product Enhancement 
 API_URL = "https://access.redhat.com/hydra/rest/search/kcs"
 ERRATA_URL = "https://access.redhat.com/errata/{id}"
 ROWS = 200
-MAX_PAGES = 10
+MAX_PAGES = 20
 TIMEOUT = 30
 FIELDS = (
     "id,portal_severity,portal_advisory_type,portal_product_names,"
     "portal_publication_date,portal_update_date,portal_synopsis,"
     "portal_product_filter"
 )
-# Regex para extrair a versão principal(major) e secundária de uma string de versão (minor)
-VERSION_RE = re.compile(r'(?<![\d.])(\d+)\.(\d+)(?:\.\d+)*(?!\d)')
 
 
 def escape_solr(value: str) -> str:
@@ -66,21 +67,22 @@ def parse_date(value):
     except ValueError:
         return None
 
-def request_page(session: requests.Session, product_fq: str, start: int) -> dict:
+def request_page(session: requests.Session, product_fq: str, start: int, cutoff: datetime = None) -> dict:
+    fq = ['documentKind:("Errata")', product_fq]
+    if cutoff:
+        since = cutoff.astimezone(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+        fq.append(f"portal_publication_date:[{since} TO *]")
     params = {
         "q": "*:*",
         "rows": ROWS,
         "start": start,
         "sort": "portal_update_date desc",
-        "fq": ['documentKind:("Errata")', product_fq],
+        "fq": fq,
         "fl": FIELDS,
         "wt": "json",
     }
     headers = {"Accept": "application/json", "User-Agent": "errata-report/2.0"}
     prepared = requests.Request("GET", API_URL, params=params, headers=headers).prepare()
-
-    # if start == 0:
-    #     print(f"          [LINK JSON] {prepared.url}")
 
     try:
         response = session.send(prepared, timeout=TIMEOUT)
@@ -91,105 +93,44 @@ def request_page(session: requests.Session, product_fq: str, start: int) -> dict
     return {}
 
 def fetch_all(session: requests.Session, product_fq: str, cutoff: datetime) -> list:
-    """Busca todas as páginas de resultados da API para um produto específico, respeitando o cutoff."""
+    """Busca páginas ordenadas por portal_update_date desc e para quando passar do cutoff."""
     docs_all = []
     start = 0
     for _ in range(MAX_PAGES):
-        data = request_page(session, product_fq, start)
+        data = request_page(session, product_fq, start, cutoff)
         response = data.get("response", {})
         docs = response.get("docs", [])
         total = response.get("numFound", 0)
-        print(f"[INFO] Total de documentos encontrados para o filtro '{product_fq}': {total}")
+        if start == 0:
+            print(f"[INFO] Total de documentos encontrados para o filtro '{product_fq}' desde o corte: {total}")
         if not docs:
             break
         docs_all.extend(docs)
         start += len(docs)
-        
+
         if start >= total:
             break
-            
+
+        # portal_publication_date <= portal_update_date, então se o último update
+        # da página é anterior ao cutoff, o restante também é.
         last_update = parse_date(docs[-1].get("portal_update_date"))
         if cutoff and last_update and last_update < cutoff:
             break
+    else:
+        print(f"  [AVISO] MAX_PAGES ({MAX_PAGES}) atingido; pode haver erratas não baixadas.")
     return docs_all
 
-def fetch_errata(product: str, version: str, cutoff: datetime) -> list:
-    """Busca erratas para um produto e versão específicos, aplicando filtros de data."""
+def fetch_errata(product: str, cutoff: datetime) -> list:
+    """Busca erratas do produto (todas as versões); o corte temporal é feito depois."""
     with requests.Session() as session:
-        for label, product_fq in product_filter_candidates(product, version):
-            docs = fetch_all(session, product_fq, cutoff) # Busca todas as páginas de resultados
-            if docs: # Se encontrou resultados, retorna imediatamente
+        for label, product_fq in product_filter_candidates(product, None):
+            docs = fetch_all(session, product_fq, cutoff)
+            if docs:
                 return docs
             print(f"  [AVISO] Filtro '{label}' retornou 0 resultados.")
     return []
 
-def _major_minor(value):
-    """'4.20.5' -> (4, 20). Retorna None se não houver versão."""
-    m = VERSION_RE.search(str(value or ""))
-    return (int(m.group(1)), int(m.group(2))) if m else None
 
-def is_version_in_range(doc: dict, v_start: str, v_end: str) -> bool:
-    """True se alguma versão (major, minor) citada na errata estiver em [v_start, v_end]."""
-    low, high = _major_minor(v_start), _major_minor(v_end)
-    if not low or not high:
-        return False
-    if low > high:
-        low, high = high, low
-
-    synopsis = as_text(doc.get("portal_synopsis"))
-    meta = as_text(doc.get("portal_product_names")) + " " + as_text(doc.get("portal_product_filter"))
-
-    # Prioridade: versão citada na sinopse; se não houver, usa os metadados do produto.
-    for text in (synopsis, meta):
-        found = {(int(a), int(b)) for a, b in VERSION_RE.findall(text)}
-        if found:
-            return any(low <= v <= high for v in found)
-    return False
-
-def get_latest_version(session: requests.Session, product_name: str, retries: int = 3) -> str:
-    """Busca as últimas erratas do produto e identifica a maior versão lançada."""
-    esc = escape_solr(product_name)
-    params = {
-        "q": "*:*",
-        "rows": 100,
-        "sort": "portal_publication_date desc",
-        "fq": ['documentKind:("Errata")', f"portal_product_filter:{esc}|*"],
-        "fl": "portal_product_filter",
-        "wt": "json",
-    }
-    headers = {"Accept": "application/json", "User-Agent": "errata-report/2.0"}
-    prepared = requests.Request("GET", API_URL, params=params, headers=headers).prepare()
-
-    docs = []
-    for attempt in range(1, retries + 1):
-        try:
-            response = session.send(prepared, timeout=TIMEOUT)
-            response.raise_for_status()
-            docs = response.json().get("response", {}).get("docs", [])
-            break
-        except requests.exceptions.RequestException as exc:
-            print(f"  [AVISO] Tentativa {attempt}/{retries} falhou ao descobrir a última versão: {exc.__class__.__name__}")
-            if attempt == retries:
-                return None
-            time.sleep(2 * attempt)
-
-    versions = set()
-    for doc in docs:
-        for f in doc.get("portal_product_filter", []):
-            parts = f.split('|')
-            if len(parts) >= 3 and parts[0].strip().lower() == product_name.lower():
-                v = parts[2].strip()
-                if v and v != "*":
-                    versions.add(v)
-
-    if not versions:
-        return None
-
-    def to_tuple(v_str):
-        match = re.match(r'^(\d+(?:\.\d+)*)', v_str)
-        return tuple(map(int, match.group(1).split('.'))) if match else (0,)
-
-    return max(versions, key=to_tuple)
 
 # tratamento de dados
 def as_text(value) -> str:
@@ -205,33 +146,92 @@ def severity_class(severity: str) -> str:
     if sev == "low": return "sev-low"
     return "sev-none"
 
-def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetime, v_start: str, v_end: str) -> list:
-    """Filtra pelas datas exatas, tipo de advisory, e formata para o template."""
+def _major_minor(value):
+    """'4.20.5' -> (4, 20). Retorna None se não houver versão."""
+    m = VERSION_RE.search(str(value or ""))
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+def _versions_in_text(text: str) -> set:
+    return {(int(a), int(b)) for a, b in VERSION_RE.findall(text)}
+
+def _versions_from_product_filter(doc: dict, product: str) -> set:
+    """Versões do próprio produto em portal_product_filter ('Produto|...|Versão|...')."""
+    raw = doc.get("portal_product_filter") or []
+    if isinstance(raw, str):
+        raw = [raw]
+    found = set()
+    for f in raw:
+        parts = [p.strip() for p in str(f).split("|")]
+        if len(parts) >= 3 and parts[0].lower() == product.lower() and parts[2] != "*":
+            mm = _major_minor(parts[2])
+            if mm:
+                found.add(mm)
+    return found
+
+def match_version(doc: dict, product: str, target: str):
+    """Retorna (bool|None, origem). None = versão não identificável em nenhum campo."""
+    tgt = _major_minor(target)
+    if not tgt:
+        return False, "target inválido"
+
+    meta = _versions_from_product_filter(doc, product)
+    syn = _versions_in_text(as_text(doc.get("portal_synopsis")))
+
+    # Metadado estruturado
+    if meta:
+        if tgt not in meta:
+            return False, "portal_product_filter"
+        # Se o metadado lista várias linhas, a sinopse desempata
+        narrowed = syn & meta
+        if narrowed and tgt not in narrowed:
+            return False, "portal_synopsis"
+        return True, "portal_product_filter"
+
+    if syn:
+        return tgt in syn, "portal_synopsis"
+
+    names = _versions_in_text(as_text(doc.get("portal_product_names")))
+    if names:
+        return tgt in names, "portal_product_names"
+
+    return None, None
+
+def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetime, product: str, version: str) -> list:
+    """Filtra por data, versão exata (major.minor) e tipo de advisory; formata para o template."""
     wanted = {t.lower() for t in ADVISORY_TYPES}
     result = []
+    unknown = []
+    in_period = 0
     for doc in docs:
         pub_date = parse_date(doc.get("portal_publication_date"))
         if not pub_date:
             continue
-            
-        # Filtro de Período data inicial e final
-        if start_date and pub_date < start_date: continue
-        if pub_date > end_date: continue
 
-        # filtro de versão
-        if not is_version_in_range(doc, v_start, v_end):
-            continue
-            
-        # Filtro de Advisory Type
+        if start_date and pub_date.date() < start_date.date(): continue
+        if pub_date > end_date: continue
+        in_period += 1     
+
+        # Tipo de advisory
         adv_type = as_text(doc.get("portal_advisory_type"))
         if wanted and adv_type.lower() not in wanted:
             continue
-            
+
+        # Versão exata
+        ok, source = match_version(doc, product, version)
+        if DEBUG_VERSIONS:
+            print(f"       [DEBUG] {doc.get('id')} -> {ok} ({source}) | "
+                  f"filter={doc.get('portal_product_filter')} | syn={doc.get('portal_synopsis')}")
+        if ok is None:
+            unknown.append(as_text(doc.get("id")))
+            if not INCLUDE_UNKNOWN_VERSION:
+                continue
+        elif not ok:
+            continue
+
         upd_date = parse_date(doc.get("portal_update_date")) or pub_date
         sev = as_text(doc.get("portal_severity")) or "None"
         errata_id = as_text(doc.get("id"))
-        
-        # Cria um dicionário limpo para facilitar o uso no Jinja2
+
         result.append({
             "id": errata_id,
             "url": ERRATA_URL.format(id=errata_id),
@@ -243,9 +243,13 @@ def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetim
             "pub_date": pub_date,
             "upd_date": upd_date
         })
-        
+
+    if unknown:
+        print(f"       [INFO] {in_period} publicada(s) no período (todas as versões); {len(result)} na versão {version}.")
+
     result.sort(key=lambda d: (d["pub_date"], d["upd_date"]), reverse=True)
     return result
+
 
 # gera relatorio 
 def save_report(report_data: list, generated_at: datetime):
@@ -297,42 +301,24 @@ def main():
     for item in products:
         product_name = item.get("product")
         version = str(item.get("version")).strip()
-        last_version_yaml = item.get("last_version")
+        start_date = parse_date(item.get("date"))
 
-        print(f"\n[INFO] Consultando: {product_name} | Versão da Empresa: {version}")
+        if not start_date:
+            print(f"[AVISO] '{product_name}' sem 'date' válido no YAML; sem corte inicial.")
+            start_date = DEFAULT_START_DATE
 
-        # logica para determinar a última versão do produto
-        with requests.Session() as session:
-            if not last_version_yaml or str(last_version_yaml).strip().lower() == "auto":
-                print("       [AUTO] Buscando qual é a versão mais recente na Red Hat...")
-                discovered_version = get_latest_version(session, product_name)
-                if discovered_version:
-                    last_version = discovered_version
-                    print(f"       [AUTO] Última versão identificada: {last_version}")
-                else:
-                    last_version = version
-                    print(f"       [AUTO] Falha ao identificar. Usando versão atual: {last_version}")
-            else:
-                last_version = str(last_version_yaml).strip()
+        print(f"\n[INFO] Consultando: {product_name} | Versão da Empresa: {version} | "
+              f"Desde: {start_date.isoformat() if start_date else 'sem data'}")
 
-        print(f"       [INFO] Intervalo de versões: {version} → {last_version}")
+        docs = fetch_errata(product_name, start_date)
+        errata_formatada = filter_and_format_errata(docs, start_date, now_utc, product_name, version)
 
-        # Filtro apenas por versão: sem data inicial
-        docs = fetch_errata(product_name, last_version, None)
-        errata_formatada = filter_and_format_errata(docs, None, now_utc, version, last_version)
-
-        print(f"       -> {len(docs)} baixada(s), {len(errata_formatada)} dentro do intervalo de versões.")
-        if docs and not errata_formatada:
-            sample = docs[0]
-            print(f"       [DEBUG] Exemplo de sinopse: {sample.get('portal_synopsis')}")
-            print(f"       [DEBUG] Exemplo de portal_product_filter: {sample.get('portal_product_filter')}")
-            print(f"       [DEBUG] Exemplo de advisory_type: {sample.get('portal_advisory_type')}")
+        print(f"       -> {len(docs)} baixada(s), {len(errata_formatada)} dentro do período.")
 
         report_data.append({
             "product": product_name,
             "version": version,
-            "last_version": last_version,
-            "start_date": None,
+            "start_date": start_date,
             "end_date": now_utc,
             "errata": errata_formatada
         })
