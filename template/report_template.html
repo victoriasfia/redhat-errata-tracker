@@ -4,154 +4,83 @@
     <meta charset="UTF-8">
     <title>Red Hat: Relatório de Erratas</title>
     <style>
-        body { 
-            font-family: 'Open Sans', Arial, sans-serif; 
-            background: #fff; 
-            color: #333; 
-            margin: 0; 
-            padding: 32px; 
-        }
-        header { 
-            border-bottom: 2px solid #d2d2d2; 
-            margin-bottom: 24px; 
-            padding-bottom: 12px;
-         }
-        h1 { 
-            font-size: 24px; 
-            margin: 0 0 8px; 
-            color: #151515; }
-        .meta { 
-            font-size: 14px; 
-            color: #555; 
-        }
-        .table-wrap { 
-            overflow-x: auto; 
-        }
-        table { 
-            border-collapse: collapse;
-            width: 100%;
-            font-size: 14px;
-        }
-        th {
-            text-align: left; 
-            padding: 12px; 
-            border-bottom: 2px solid #d2d2d2; 
-            white-space: nowrap; 
-        }
-        td { 
-            padding: 12px; 
-            border-bottom: 1px solid #e6e6e6;
-            vertical-align: top; }
-        td.adv { 
-            white-space: nowrap; 
-            font-weight: 600;
-         }
-        tr:hover td { 
-            background: #fafafa; 
-        }
-        a { 
-            color: #0066cc; text-decoration: none; }
-        a:hover { 
-            text-decoration: underline; }
-        .badge { 
-            display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-        .sev-high { 
-            background: #c9190b; color: #fff; }
-        .sev-moderate { 
-            background: #ec7a08; color: #fff; }
-        .sev-low { 
-            background: #f0ab00; color: #fff; }
-        .sev-none { 
-            background: #e0e0e0; color: #444; border: 1px solid #c7c7c7; }
-        .empty { 
-            text-align: center; padding: 32px; color: #666; }
-        footer { 
-            margin-top: 24px; font-size: 12px; color: #888; }
-
-        /* --- Estilos da funcionalidade de Abrir e Fechar --- */
-        details {
-            margin-bottom: 24px;
-            border-bottom: 1px solid #e6e6e6;
-            padding-bottom: 16px;
-        }
-        summary.collapsible-title {
-            cursor: pointer;
-            list-style: none; /* Remove a setinha padrão do HTML */
-            user-select: none;
-        }
-        summary.collapsible-title::-webkit-details-marker {
-            display: none; /* Remove a setinha no Chrome/Safari */
-        }
-        summary.collapsible-title h2 {
-            display: inline-block;
-            margin: 0;
-            vertical-align: middle;
-        }
-        summary.collapsible-title::before {
-            content: "[+] ";
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #151515;
-            margin-right: 4px;
-            vertical-align: middle;
-        }
-        /* Quando a aba estiver aberta, troca para [-] */
-        details[open] > summary.collapsible-title::before {
-            content: "[-] ";
-        }
-        .details-content {
-            margin-top: 16px;
-        }
+        body { font-family: 'Open Sans', Arial, sans-serif; background: #fff; color: #333; margin: 0; padding: 32px; }
+        header { border-bottom: 2px solid #d2d2d2; margin-bottom: 24px; padding-bottom: 12px; }
+        h1 { font-size: 24px; margin: 0 0 8px; color: #151515; }
+        .meta { font-size: 14px; color: #555; }
+        .table-wrap { overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; font-size: 14px; }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid #d2d2d2; white-space: nowrap; }
+        td { padding: 12px; border-bottom: 1px solid #e6e6e6; vertical-align: top; }
+        td.adv { white-space: nowrap; font-weight: 600; }
+        tr:hover td { background: #fafafa; }
+        a { color: #0066cc; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .sev-high { background: #c9190b; color: #fff; }
+        .sev-moderate { background: #ec7a08; color: #fff; }
+        .sev-low { background: #f0ab00; color: #fff; }
+        .sev-none { background: #e0e0e0; color: #444; border: 1px solid #c7c7c7; }
+        .empty { text-align: center; padding: 32px; color: #666; }
+        footer { margin-top: 24px; font-size: 12px; color: #888; }
+        details { margin-bottom: 24px; border-bottom: 1px solid #e6e6e6; padding-bottom: 16px; }
+        summary.collapsible-title { cursor: pointer; list-style: none; user-select: none; }
+        summary.collapsible-title::-webkit-details-marker { display: none; }
+        summary.collapsible-title h2 { display: inline-block; margin: 0; vertical-align: middle; }
+        summary.collapsible-title::before { content: "[+] "; font-size: 1.5em; font-weight: bold; color: #151515; margin-right: 4px; vertical-align: middle; }
+        details[open] > summary.collapsible-title::before { content: "[-] "; }
+        .details-content { margin-top: 16px; }
     </style>
 </head>
-<body>
+<body style="font-family: 'Open Sans', Arial, sans-serif; background: #fff; color: #333; margin: 0; padding: 32px;">
+    
     {% if not is_email %}
     <img src="https://intranet.prodest.es.gov.br/Media/IntranetProdest/_Profiles/44f0b16d/d8e43242/Logomarca_Prodest_320.png?v=639063793643692270" width="220" 
     style="width: 90px; max-width: 100%; height: auto; border: 0; margin-bottom: 16px;">
     {% endif %}
-    <header>
-        <h1>Red Hat: Relatório de Erratas</h1>
-        <div class="meta"><strong>Gerado em:</strong> {{ generated_at.strftime("%d/%m/%Y %H:%M:%S UTC") }}</div>
+    
+    <header style="border-bottom: 2px solid #d2d2d2; margin-bottom: 24px; padding-bottom: 12px;">
+        <h1 style="font-size: 24px; margin: 0 0 8px; color: #151515;">Red Hat: Relatório de Erratas</h1>
+        <div class="meta" style="font-size: 14px; color: #555;"><strong>Gerado em:</strong> {{ generated_at.strftime("%d/%m/%Y %H:%M:%S UTC") }}</div>
     </header>
 
     <!-- loop de todos os produtos-->
     {% for item in report_data %}
-        <details {% if is_email %}open{% endif %}>
-            <summary class="collapsible-title">
-                <h2>{{ item.product }}</h2>
+        <details {% if is_email %}open{% endif %} style="margin-bottom: 24px; border-bottom: 1px solid #e6e6e6; padding-bottom: 16px;">
+            <summary class="collapsible-title" style="cursor: pointer; list-style: none; user-select: none;">
+                <h2 style="display: inline-block; margin: 0; vertical-align: middle;">{{ item.product }}</h2>
             </summary>
             
-            <div class="details-content">
-                <div class="product-meta">
+            <div class="details-content" style="margin-top: 16px;">
+                <div class="product-meta" style="margin-bottom: 12px;">
                     <strong>Versão utilizada:</strong> {{ item.version }}<br>
-                    
                 </div>
 
-                <div class="table-wrap">
-                    <table>
+                <div class="table-wrap" style="overflow-x: auto;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-size: 14px; text-align: left;">
                         <thead>
                             <tr>
-                                <th>Advisory</th>
-                                <th>Synopsis</th>
-                                <th>Advisory Type</th>
-                                <th>Severity</th>
-                                <th>Issued Date</th>
-                                <th>Updated Date</th>
+                                <th style="text-align: left; padding: 12px; border-bottom: 2px solid #d2d2d2; white-space: nowrap;">Advisory</th>
+                                <th style="text-align: left; padding: 12px; border-bottom: 2px solid #d2d2d2;">Synopsis</th>
+                                <th style="text-align: left; padding: 12px; border-bottom: 2px solid #d2d2d2;">Advisory Type</th>
+                                <th style="text-align: left; padding: 12px; border-bottom: 2px solid #d2d2d2;">Severity</th>
+                                <th style="text-align: left; padding: 12px; border-bottom: 2px solid #d2d2d2; white-space: nowrap;">Issued Date</th>
+                                <th style="text-align: left; padding: 12px; border-bottom: 2px solid #d2d2d2; white-space: nowrap;">Updated Date</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for doc in item.errata %}
                                 <tr>
-                                    <td><a href="{{ doc.url }}">{{ doc.id }}</a></td>
-                                    <td>{{ doc.synopsis }}</td>
-                                    <td>{{ doc.advisory_type }}</td>
-                                    <td><span class="badge {{ doc.severity_class }}">{{ doc.severity }}</span></td>
-                                    <td>{{ doc.pub_date.strftime("%d/%m/%Y") }}</td>
-                                    <td>{{ doc.upd_date.strftime("%d/%m/%Y") }}</td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #e6e6e6; vertical-align: top;"><a href="{{ doc.url }}" style="color: #0066cc; text-decoration: none;">{{ doc.id }}</a></td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #e6e6e6; vertical-align: top;">{{ doc.synopsis }}</td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #e6e6e6; vertical-align: top;">{{ doc.advisory_type }}</td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #e6e6e6; vertical-align: top;"><span class="badge {{ doc.severity_class }}">{{ doc.severity }}</span></td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #e6e6e6; vertical-align: top; white-space: nowrap;">{{ doc.pub_date.strftime("%d/%m/%Y") }}</td>
+                                    <td style="padding: 12px; border-bottom: 1px solid #e6e6e6; vertical-align: top; white-space: nowrap;">{{ doc.upd_date.strftime("%d/%m/%Y") }}</td>
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="6" class="empty">Nenhuma errata encontrada.</td>
+                                    <td colspan="6" class="empty" style="text-align: center; padding: 32px; color: #666; border-bottom: 1px solid #e6e6e6;">Nenhuma errata encontrada.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>

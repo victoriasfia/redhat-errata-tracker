@@ -4,6 +4,7 @@ email:
   smtp_server: "sistemas.mail.dcpr.es.gov.br"
   smtp_port: 25
   recipients:
+    # - "daniel.carvalho@prodest.es.gov.br"
     - "victoria.teixeira@prodest.es.gov.br"
 
 products: 
