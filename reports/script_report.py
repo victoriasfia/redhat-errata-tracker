@@ -270,10 +270,11 @@ def save_report(report_data: list, generated_at: datetime):
     email_core = template.render(report_data=report_data, generated_at=generated_at, is_email=True)
     
     # 3. Extrai apenas os estilos (<style>) e o miolo (<body>) para injetar no container de e-mail
-    style_match = re.search(r'<style>(.*?)</style>', email_core, re.DOTALL)
+    style_match = re.search(r'<style[^>]*>(.*?)</style>', email_core, re.DOTALL | re.IGNORECASE)
     styles = style_match.group(1) if style_match else ""
 
-    body_match = re.search(r'<body>(.*?)</body>', email_core, re.DOTALL)
+    # garante que ele encontre o <body> mesmo com os styles inline
+    body_match = re.search(r'<body[^>]*>(.*?)</body>', email_core, re.DOTALL | re.IGNORECASE)
     body_content = body_match.group(1) if body_match else email_core
 
     # Renderiza o Template de E-mail mesclando o layout da Instituição com as tabelas do relatório
