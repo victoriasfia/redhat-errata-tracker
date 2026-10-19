@@ -105,8 +105,10 @@
     </style>
 </head>
 <body>
+    {% if not is_email %}
     <img src="https://intranet.prodest.es.gov.br/Media/IntranetProdest/_Profiles/44f0b16d/d8e43242/Logomarca_Prodest_320.png?v=639063793643692270" width="220" 
     style="width: 90px; max-width: 100%; height: auto; border: 0; margin-bottom: 16px;">
+    {% endif %}
     <header>
         <h1>Red Hat: Relatório de Erratas</h1>
         <div class="meta"><strong>Gerado em:</strong> {{ generated_at.strftime("%d/%m/%Y %H:%M:%S UTC") }}</div>
@@ -114,7 +116,7 @@
 
     <!-- loop de todos os produtos-->
     {% for item in report_data %}
-        <details>
+        <details {% if is_email %}open{% endif %}>
             <summary class="collapsible-title">
                 <h2>{{ item.product }}</h2>
             </summary>

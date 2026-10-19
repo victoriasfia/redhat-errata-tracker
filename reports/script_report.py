@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import requests
 from jinja2 import Environment, FileSystemLoader
 import re
+from email_service import send_report_email
 
 VERSION_RE = re.compile(r'(?<![\d.])(\d+)\.(\d+)(?:\.\d+)*(?!\d)')
 DEBUG_VERSIONS = False  # True: imprime versões detectadas e a origem de cada errata
@@ -253,25 +254,39 @@ def filter_and_format_errata(docs: list, start_date: datetime, end_date: datetim
 
 # gera relatorio 
 def save_report(report_data: list, generated_at: datetime):
-    """Salva o relatório em HTML usando Jinja2 e retorna o caminho do arquivo gerado."""
+    """Salva o relatório em HTML e prepara o corpo e o HTML para o E-mail."""
     env = Environment(loader=FileSystemLoader(TEMPLATE_DIR))
     try:
         template = env.get_template(TEMPLATE_FILE)
+        email_template = env.get_template("template_email.html")
     except Exception as exc:
-        print(f"\n[ERRO] Não foi possível carregar o template HTML '{TEMPLATE_FILE}' na pasta '{TEMPLATE_DIR}'.\nErro: {exc}")
+        print(f"\n[ERRO] Não foi possível carregar os templates HTML na pasta '{TEMPLATE_DIR}'.\nErro: {exc}")
         sys.exit(1)
 
-    # Renderiza passando os dados e a data atual
-    html_content = template.render(report_data=report_data, generated_at=generated_at)
+    # 1. Renderiza o HTML original para o anexo com formato standalone
+    html_content = template.render(report_data=report_data, generated_at=generated_at, is_email=False)
 
-    # Salva em arquivo
+    # 2. Renderiza o mesmo conteúdo com pequenas adequações para exibição no email
+    email_core = template.render(report_data=report_data, generated_at=generated_at, is_email=True)
+    
+    # 3. Extrai apenas os estilos (<style>) e o miolo (<body>) para injetar no container de e-mail
+    style_match = re.search(r'<style>(.*?)</style>', email_core, re.DOTALL)
+    styles = style_match.group(1) if style_match else ""
+
+    body_match = re.search(r'<body>(.*?)</body>', email_core, re.DOTALL)
+    body_content = body_match.group(1) if body_match else email_core
+
+    # Renderiza o Template de E-mail mesclando o layout da Instituição com as tabelas do relatório
+    email_html = email_template.render(report_content=body_content, report_styles=styles)
+
+    # Salva o arquivo standalone gerado
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     filename = f"Report_Erratas_Consolidado_{generated_at.strftime('%Y%m%d_%H%M%S')}.html"
     path = os.path.join(OUTPUT_DIR, filename)
     with open(path, "w", encoding="utf-8") as f:
         f.write(html_content)
     
-    return path
+    return path, email_html
 
 def main():
     if not os.path.exists(YAML_FILE):
@@ -290,7 +305,6 @@ def main():
         print("[AVISO] Nenhum produto encontrado no arquivo YAML sob a chave 'products'.")
         sys.exit(0)
 
-    # Data/Hora do momento em que o script está sendo executado
     now_utc = datetime.now(timezone.utc)
     report_data = []
 
@@ -298,6 +312,7 @@ def main():
     print("Iniciando geração do Relatório Consolidado de Erratas")
     print("=" * 60)
 
+    # (Lógica de consultar Erratas. Mantenha igual)
     for item in products:
         product_name = item.get("product")
         version = str(item.get("version")).strip()
@@ -306,7 +321,7 @@ def main():
         if not start_date:
             print(f"[AVISO] '{product_name}' sem 'date' válido no YAML; sem corte inicial.")
             start_date = DEFAULT_START_DATE
-
+ 
         print(f"\n[INFO] Consultando: {product_name} | Versão da Empresa: {version} | "
               f"Desde: {start_date.isoformat() if start_date else 'sem data'}")
 
@@ -325,9 +340,34 @@ def main():
 
     print("\n" + "=" * 60)
     
-    # Gera HTML 
-    path = save_report(report_data, now_utc)
+    # Salva o arquivo e obtém o HTML pronto pro e-mail
+    path, email_html_body = save_report(report_data, now_utc)
     print(f"[OK] Relatório Consolidado salvo com sucesso em: {path}")
+
+    # ennvio automatico
+    email_config = config.get("email", {})
+    if email_config.get("enabled", False):
+        sender = email_config.get("sender", "no-reply@prodest.es.gov.br")
+        recipients = email_config.get("recipients", [])
+        smtp_server = email_config.get("smtp_server", "sistemas.mail.dcpr.es.gov.br")
+        smtp_port = email_config.get("smtp_port", 25)
+        subject = f"Red Hat: Relatório Consolidado de Erratas - {now_utc.strftime('%d/%m/%Y')}"
+        
+        # Prevenção de envio durante testes unitários
+        if os.environ.get("UNIT_TEST") == "1":
+            print("[INFO] Execução de teste unitário detectada. O e-mail não será enviado.")
+        else:
+            print(f"[INFO] Preparando envio de e-mail para {len(recipients)} destinatário(s)...")
+            send_report_email(
+                smtp_server=smtp_server,
+                smtp_port=smtp_port,
+                sender=sender,
+                recipients=recipients,
+                subject=subject,
+                html_content=email_html_body,
+                attachment_path=path,
+                attachment_name="redhat_errata_report.html"
+            )
 
 if __name__ == "__main__":
     main()
