@@ -10,10 +10,8 @@ from email_service import send_report_email
 VERSION_RE = re.compile(r'(?<![\d.])(\d+)\.(\d+)(?:\.\d+)*(?!\d)')
 DEBUG_VERSIONS = False  # True: imprime versões detectadas e a origem de cada errata
 INCLUDE_UNKNOWN_VERSION = False  
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-YAML_FILE = os.path.join(PROJECT_ROOT, "yaml", "products.yaml")
 TEMPLATE_DIR = os.path.join(PROJECT_ROOT, "template")
 TEMPLATE_FILE = "report_template.html"
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "generated_reports")
@@ -124,11 +122,10 @@ def fetch_all(session: requests.Session, product_fq: str, cutoff: datetime) -> l
 def fetch_errata(product: str, cutoff: datetime) -> list:
     """Busca erratas do produto (todas as versões); o corte temporal é feito depois."""
     with requests.Session() as session:
-        for label, product_fq in product_filter_candidates(product, None):
+        for product_fq in product_filter_candidates(product, None):
             docs = fetch_all(session, product_fq, cutoff)
             if docs:
                 return docs
-            print(f"  [AVISO] Filtro '{label}' retornou 0 resultados.")
     return []
 
 

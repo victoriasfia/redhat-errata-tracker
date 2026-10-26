@@ -4,3 +4,7 @@ __pycache__/
 venv
 generated_reports
 produtos.txt
+instru_es_da_atividade.md
+instrucao.md
+configmap.yaml
+cronjob.yaml
