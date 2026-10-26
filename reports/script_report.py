@@ -1,6 +1,6 @@
 import os
 import sys
-import yaml
+import json
 from datetime import datetime, timezone
 import requests
 from jinja2 import Environment, FileSystemLoader
@@ -290,20 +290,33 @@ def save_report(report_data: list, generated_at: datetime):
     return path, email_html
 
 def main():
-    if not os.path.exists(YAML_FILE):
-        print(f"[ERRO] O arquivo YAML '{YAML_FILE}' não foi encontrado.")
+    # 1. VALIDAÇÃO DA ENTRADA DO CLUSTER
+    if len(sys.argv) < 2 or not sys.argv[1].endswith('.json'):
+        print("[ERRO] É necessário passar o arquivo JSON extraído do cluster como argumento.")
+        # print("Uso: python3 script_report.py /caminho/para/dados.json")
         sys.exit(1)
 
-    with open(YAML_FILE, 'r', encoding='utf-8') as file:
-        try:
-            config = yaml.safe_load(file)
-        except yaml.YAMLError as exc:
-            print(f"[ERRO] Erro ao analisar o YAML: {exc}")
-            sys.exit(1)
+    json_file = sys.argv[1]
+    print(f"[INFO] Lendo dados dinamicamente da extração do cluster: {json_file}")
+    
+    products = []
+    
+    # 2. LEITURA DIRETA DO JSON DO OPENSHIFT
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            cluster_data = json.load(f)
+            for item in cluster_data.get("items", []):
+                products.append({
+                    "product": item["spec"].get("displayName", ""),
+                    "version": item["spec"].get("version", ""),
+                    "date": item["metadata"].get("creationTimestamp", "")
+                })
+    except Exception as e:
+        print(f"[ERRO] Falha ao processar o arquivo JSON: {e}")
+        sys.exit(1)
 
-    products = config.get("products", [])
     if not products:
-        print("[AVISO] Nenhum produto encontrado no arquivo YAML sob a chave 'products'.")
+        print("[AVISO] Nenhum produto encontrado no JSON do cluster.")
         sys.exit(0)
 
     now_utc = datetime.now(timezone.utc)
@@ -313,18 +326,13 @@ def main():
     print("Iniciando geração do Relatório Consolidado de Erratas")
     print("=" * 60)
 
-    # (Lógica de consultar Erratas. Mantenha igual)
+    # 3. ROTINA DE BUSCA
     for item in products:
         product_name = item.get("product")
         version = str(item.get("version")).strip()
         start_date = parse_date(item.get("date"))
 
-        if not start_date:
-            print(f"[AVISO] '{product_name}' sem 'date' válido no YAML; sem corte inicial.")
-            start_date = DEFAULT_START_DATE
- 
-        print(f"\n[INFO] Consultando: {product_name} | Versão da Empresa: {version} | "
-              f"Desde: {start_date.isoformat() if start_date else 'sem data'}")
+        print(f"\n[INFO] Consultando: {product_name} | Versão da Empresa: {version}")
 
         docs = fetch_errata(product_name, start_date)
         errata_formatada = filter_and_format_errata(docs, start_date, now_utc, product_name, version)
@@ -341,20 +349,22 @@ def main():
 
     print("\n" + "=" * 60)
     
-    # Salva o arquivo e obtém o HTML pronto pro e-mail
     path, email_html_body = save_report(report_data, now_utc)
     print(f"[OK] Relatório Consolidado salvo com sucesso em: {path}")
 
-    # ennvio automatico
-    email_config = config.get("email", {})
-    if email_config.get("enabled", False):
-        sender = email_config.get("sender", "no-reply@prodest.es.gov.br")
-        recipients = email_config.get("recipients", [])
-        smtp_server = email_config.get("smtp_server", "sistemas.mail.dcpr.es.gov.br")
-        smtp_port = email_config.get("smtp_port", 25)
-        subject = f"Red Hat: Relatório Consolidado de Erratas - {now_utc.strftime('%d/%m/%Y')}"
+    # 4. CONFIGURAÇÃO DE E-MAIL VIA VARIÁVEIS DE AMBIENTE (KUBERNETES)
+    email_enabled = os.getenv("EMAIL_ENABLED", "true").lower() == "true"
+    
+    if email_enabled:
+        sender = os.getenv("EMAIL_SENDER", "no-reply@prodest.es.gov.br")
+        # Lê a string do OpenShift e transforma em lista de e-mails
+        recipients_str = os.getenv("EMAIL_RECIPIENTS", "")
+        recipients = [r.strip() for r in recipients_str.split(",")] if recipients_str else []
         
-        # Prevenção de envio durante testes unitários
+        smtp_server = os.getenv("SMTP_SERVER", "sistemas.mail.dcpr.es.gov.br")
+        smtp_port = int(os.getenv("SMTP_PORT", 25))
+        subject = f"Red Hat: Relatório de Operators SBX - {now_utc.strftime('%d/%m/%Y')}"
+        
         if os.environ.get("UNIT_TEST") == "1":
             print("[INFO] Execução de teste unitário detectada. O e-mail não será enviado.")
         else:
